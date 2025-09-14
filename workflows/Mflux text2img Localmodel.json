@@ -18,11 +18,11 @@
       "mode": 0,
       "inputs": [
         {
-          "name": "Local_models",
+          "name": "Local_model",
           "type": "PATH",
           "link": 1,
           "shape": 7,
-          "label": "Local_models"
+          "label": "Local_model"
         },
         {
           "name": "Loras",
@@ -57,13 +57,18 @@
         "Luxury food photograph",
         "schnell",
         "None",
-        166089506520211,
-        "randomize",
+        -1,
         512,
         512,
         2,
         3.5,
-        "false",
+        true,
+        "dev",
+        false,
+        "Custom",
+        true,
+        "Balanced (25 steps)",
+        true,
         true
       ]
     },
@@ -111,12 +116,12 @@
       "inputs": [],
       "outputs": [
         {
-          "name": "Local_models",
+          "name": "Local_model",
           "type": "PATH",
           "links": [
             1
           ],
-          "label": "Local_models"
+          "label": "Local_model"
         }
       ],
       "properties": {

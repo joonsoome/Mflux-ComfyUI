@@ -57,11 +57,11 @@
           "label": "Local_model"
         },
         {
-          "name": "image",
-          "type": "MfluxImagePipeline",
+          "name": "img2img",
+          "type": "MfluxImg2ImgPipeline",
           "link": 6,
           "shape": 7,
-          "label": "image"
+          "label": "img2img"
         },
         {
           "name": "Loras",
@@ -96,12 +96,17 @@
         "Luxury food photograph",
         "schnell",
         "4",
-        1125899906842624,
-        "fixed",
+        -1,
         512,
         512,
         30,
         3.5,
+        true,
+        "dev",
+        false,
+        "Custom",
+        true,
+        "Balanced (25 steps)",
         true,
         true
       ]
@@ -136,7 +141,7 @@
     },
     {
       "id": 7,
-      "type": "MfluxLodeImage",
+  "type": "MfluxImg2Img",
       "pos": {
         "0": 34,
         "1": 187
@@ -151,12 +156,12 @@
       "inputs": [],
       "outputs": [
         {
-          "name": "image",
-          "type": "MfluxImagePipeline",
+          "name": "img2img",
+          "type": "MfluxImg2ImgPipeline",
           "links": [
             6
           ],
-          "label": "image",
+          "label": "img2img",
           "slot_index": 0
         },
         {
@@ -173,7 +178,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "MfluxLodeImage"
+  "Node name for S&R": "MfluxImg2Img"
       },
       "widgets_values": [
         "IMG_0198.jpeg",
@@ -205,7 +210,7 @@
       0,
       1,
       1,
-      "MfluxImagePipeline"
+      "MfluxImg2ImgPipeline"
     ]
   ],
   "groups": [],

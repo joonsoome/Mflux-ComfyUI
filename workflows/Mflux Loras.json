@@ -63,11 +63,11 @@
       "mode": 0,
       "inputs": [
         {
-          "name": "Local_models",
+          "name": "Local_model",
           "type": "PATH",
           "link": null,
           "shape": 7,
-          "label": "Local_models"
+          "label": "Local_model"
         },
         {
           "name": "Loras",
@@ -102,14 +102,19 @@
         "There, at the very end of the earth In an unprecedented blue distance Hearing the sounds of unprecedented words Sweetly and sweetly the blood stops There the winds fly touching the stars Where trees are not afraid of thunderstorms There ships are roaming the ocean There, at the very end of the earth, glitter, hyper detailed, ornate, professional photo, photorealism, vivid color, chiaroscuro",
         "schnell",
         "4",
-        1115004813920489,
-        "randomize",
+        -1,
         1216,
         832,
         4,
         3.5,
-        "true",
-        ""
+        true,
+        "dev",
+        false,
+        "Custom",
+        true,
+        "Balanced (25 steps)",
+        true,
+        true
       ]
     },
     {

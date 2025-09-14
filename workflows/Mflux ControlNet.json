@@ -51,9 +51,9 @@
       "inputs": [
         {
           "name": "image",
-          "type": "MfluxImagePipeline",
-          "link": 44,
-          "shape": 7,
+          "type": "STRING",
+          "link": null,
+          "widget": {"name": "image"},
           "label": "image"
         }
       ],
@@ -68,12 +68,26 @@
           "label": "ControlNet"
         },
         {
+          "name": "width",
+          "type": "INT",
+          "links": [],
+          "slot_index": 1,
+          "label": "width"
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": [],
+          "slot_index": 2,
+          "label": "height"
+        },
+        {
           "name": "preprocessed_image",
           "type": "IMAGE",
           "links": [
             38
           ],
-          "slot_index": 1,
+          "slot_index": 3,
           "label": "preprocessed_image"
         }
       ],
@@ -164,11 +178,11 @@
           "label": "Local_model"
         },
         {
-          "name": "image",
-          "type": "MfluxImagePipeline",
+          "name": "img2img",
+          "type": "MfluxImg2ImgPipeline",
           "link": 43,
           "shape": 7,
-          "label": "image"
+          "label": "img2img"
         },
         {
           "name": "Loras",
@@ -221,19 +235,24 @@
         "1girl, ",
         "schnell",
         "4",
-        801448522607649,
-        "randomize",
+        -1,
         512,
         512,
         4,
         3.5,
+        true,
+        "dev",
+        false,
+        "Custom",
+        true,
+        "Balanced (25 steps)",
         true,
         true
       ]
     },
     {
       "id": 20,
-      "type": "MfluxLodeImage",
+  "type": "MfluxImg2Img",
       "pos": {
         "0": 44,
         "1": 67
@@ -248,13 +267,12 @@
       "inputs": [],
       "outputs": [
         {
-          "name": "image",
-          "type": "MfluxImagePipeline",
+          "name": "img2img",
+          "type": "MfluxImg2ImgPipeline",
           "links": [
-            43,
-            44
+            43
           ],
-          "label": "image",
+          "label": "img2img",
           "slot_index": 0
         },
         {
@@ -277,7 +295,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "MfluxLodeImage"
+  "Node name for S&R": "MfluxImg2Img"
       },
       "widgets_values": [
         "图像.jpeg",
@@ -314,7 +332,7 @@
     [
       38,
       17,
-      1,
+      3,
       18,
       0,
       "IMAGE"
@@ -325,15 +343,7 @@
       0,
       9,
       1,
-      "MfluxImagePipeline"
-    ],
-    [
-      44,
-      20,
-      0,
-      17,
-      0,
-      "MfluxImagePipeline"
+      "MfluxImg2ImgPipeline"
     ],
     [
       45,
