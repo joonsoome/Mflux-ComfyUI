@@ -1,0 +1,31 @@
+requirements.txt
+LICENSE
+.gitignore
+pyproject.toml
+__init__.py
+README_zh.md
+README.md
+examples/Air_Custom_models_loras.png
+examples/Air_Custom_models_default.png
+examples/Plus2.png
+examples/Mflux_Metadata.png
+examples/Pro_ControlNet_new.png
+examples/Pro_ControlNet.png
+examples/Air_Local_models.png
+examples/Plus1.png
+examples/Air_img2img.png
+examples/Pro_Loras.png
+examples/Air_Downloaded_models.png
+examples/Air.png
+.github/workflows/publish.yml
+Mflux_Comfy/__init__.py
+Mflux_Comfy/Mflux_Core.py
+Mflux_Comfy/Mflux_Air.py
+Mflux_Comfy/Mflux_Pro.py
+workflows/Mflux text2img Localmodel.json
+workflows/Translate + Mflux.json
+workflows/Florence2 + Mflux.json
+workflows/Mflux Loras.json
+workflows/Mflux text2img.json
+workflows/Mflux ControlNet New.json
+workflows/Mflux img2img.json
