@@ -69,6 +69,22 @@ Under MFlux/Pro:
 - Mflux Loras Loader
 - Mflux ControlNet Loader
 
+## Developer notes — additional nodes & tests
+
+This fork also includes several Pro-phase nodes and unit tests that are not part of the upstream quick-start. They are intended for contributors and advanced users:
+
+- MfluxUpscale (MFlux/Pro): an upscaler node that accepts a ComfyUI `IMAGE` tensor as the preferred input and has backwards-compatible support for legacy file-selection widgets. The node writes a temporary PNG when an IMAGE tensor is provided and will save PNG + JSON metadata by default.
+- MfluxFill, MfluxDepth, MfluxRedux (MFlux/Pro): additional Flux tools (inpainting/fill, depth-conditioned generation, and redux/variations). These nodes forward phase-2 style config keys such as `masked_image_path`, `depth_image_path`, `redux_image_paths`, and `redux_image_strengths` to the core `generate_image` flow.
+
+Tests added in the `tests/` folder include unit-level tests that:
+
+- Verify parameter migration and metadata saving (`tests/test_metadata_contents.py`).
+- Exercise node-level behavior for Fill/Depth/Redux by spying on the `save_images_with_metadata` call (`tests/test_fill_node.py`, `tests/test_depth_node.py`, `tests/test_redux_node.py`).
+- Validate the `generate_image` TypeError fallback path used to remove unknown config keys (`tests/test_config_fallback.py`).
+- Contain upscale-specific internals tests for converting ComfyUI IMAGE tensors and preserving backwards-compatibility (`tests/test_upscale_internals.py`).
+
+If you plan to extend the pack with more Flux tools (Kontext, In-Context LoRA, CatVTON, Concept-Attention), the existing tests and `Mflux_Comfy/Mflux_Core.py` retry-on-TypeError pattern are useful blueprints for handling API drift across mflux versions.
+
 ## Usage tips
 
 - LoRA + quantize < 8 is not supported → set quantize to 8 when using LoRAs
