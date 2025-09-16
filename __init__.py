@@ -1,5 +1,19 @@
-from Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels
-from Mflux_Comfy.Mflux_Pro import MfluxImg2Img, MfluxLorasLoader, MfluxControlNetLoader, MfluxUpscale  # 仅导入所需的非实验节点
+try:
+    # Normal package import when executed as a package by ComfyUI
+    from .Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels
+    from .Mflux_Comfy.Mflux_Pro import MfluxImg2Img, MfluxLorasLoader, MfluxControlNetLoader, MfluxUpscale
+except Exception:
+    # Fallback for environments where relative imports fail (e.g., direct execution during tests).
+    import os
+    import sys
+    pkg_root = os.path.dirname(__file__)
+    comfy_root = os.path.dirname(os.path.dirname(__file__))
+    if pkg_root not in sys.path:
+        sys.path.insert(0, pkg_root)
+    if comfy_root not in sys.path:
+        sys.path.insert(0, comfy_root)
+    from Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels
+    from Mflux_Comfy.Mflux_Pro import MfluxImg2Img, MfluxLorasLoader, MfluxControlNetLoader, MfluxUpscale
 
 NODE_CLASS_MAPPINGS = {
     "QuickMfluxNode": QuickMfluxNode,

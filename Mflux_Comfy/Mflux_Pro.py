@@ -425,12 +425,22 @@ class MfluxControlNetLoader:
 class MfluxUpscale:
     @classmethod
     def INPUT_TYPES(cls):
+        # Maintain compatibility with previously-saved graphs by keeping the legacy
+        # `image` combo and `upload` IMAGEUPLOAD widgets present (they are optional
+        # and ignored when using `input_image`). New workflows should prefer `input_image`.
         input_dir = folder_paths.get_input_directory()
-        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        try:
+            files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        except Exception:
+            files = []
+
         return {
             "required": {
                 "prompt": ("STRING", {"multiline": False, "default": "Upscale", "tooltip": "Optional prompt guiding the upscaler."}),
-                "image": (sorted(files), {"image_upload": True, "tooltip": "Select the source image to upscale."}),
+                # Legacy file-selection (kept for compatibility with existing graphs).
+                "image": (sorted(files), {"image_upload": True, "tooltip": "(Compatibility) Select a source image file. Prefer providing `input_image` instead."}),
+                # Preferred modern input: ComfyUI IMAGE tensor
+                "input_image": ("IMAGE", {"tooltip": "ComfyUI IMAGE tensor to upscale (preferred)."}),
                 "scale": (["1.5","2","3","4"], {"default": "2", "tooltip": "Upscale multiplier applied to input image."}),
                 "control_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "How strongly the Upscaler ControlNet follows the source image."}),
                 "steps": ("INT", {"default": 28, "min": 1, "max": 200, "tooltip": "Inference steps for the upscaler."}),
@@ -445,6 +455,8 @@ class MfluxUpscale:
                 "metadata": ("BOOLEAN", {"default": True, "label_on": "Save", "label_off": "Skip", "tooltip": "Save PNG + JSON metadata."}),
                 "vae_tiling": ("BOOLEAN", {"default": False, "label_on": "On", "label_off": "Off", "tooltip": "Enable VAE tiling to reduce peak memory for large upscales (may introduce seams)."}),
                 "vae_tiling_split": (["horizontal", "vertical"], {"default": "horizontal", "tooltip": "When vae_tiling is enabled, choose split orientation for tiling."}),
+                # Legacy upload widget (kept for backward compatibility). Ignored if input_image provided.
+                "upload": ("IMAGEUPLOAD", {"tooltip": "(Compatibility) Legacy upload widget; ignored if using `input_image`."}),
             }
         }
 
@@ -453,9 +465,65 @@ class MfluxUpscale:
     FUNCTION = "generate_upscale"
     CATEGORY = "MFlux/Pro"
 
-    def generate_upscale(self, prompt, image, scale, control_strength, steps, seed, model, quantize="8", Loras=None, base_model="dev", low_ram=False, metadata=True, vae_tiling=False, vae_tiling_split="horizontal"):
-        # Prepare oriented source
-        control_image_path = folder_paths.get_annotated_filepath(image)
+    def generate_upscale(self, prompt, input_image=None, image=None, scale="2", control_strength=0.6, steps=28, seed=-1, model="schnell", quantize="8", Loras=None, base_model="dev", low_ram=False, metadata=True, vae_tiling=False, vae_tiling_split="horizontal"):
+        # Backwards-compatible signature: accept either a ComfyUI IMAGE tensor via `input_image`
+        # or a legacy file selector name via `image` (the latter resolves via folder_paths.get_annotated_filepath).
+        # Upscale accepts a ComfyUI IMAGE tensor as the source. Convert and save it into the input directory.
+        control_image_path = None
+        try:
+            import time
+            import uuid
+            import numpy as _np
+            in_dir = folder_paths.get_input_directory()
+            fname = f"from_tensor_{int(time.time()*1000)}_{uuid.uuid4().hex[:6]}.png"
+            out_path = os.path.join(in_dir, fname)
+
+            # If input_image is None, but a legacy `image` filename was provided, resolve it and
+            # use that file directly; skip conversion.
+            if input_image is None and image is not None:
+                control_image_path = folder_paths.get_annotated_filepath(image)
+            else:
+                # Support torch tensors and numpy arrays
+                np_img = None
+                try:
+                    if hasattr(input_image, 'detach') and hasattr(input_image, 'cpu'):
+                        np_img = input_image.detach().cpu().numpy()
+                    elif hasattr(input_image, 'numpy'):
+                        np_img = input_image.numpy()
+                    else:
+                        np_img = _np.array(input_image)
+                except Exception:
+                    np_img = _np.array(input_image)
+
+            # Typical ComfyUI IMAGE tensor shape: [B, H, W, C] with float32 in 0..1
+            if np_img is None:
+                raise ValueError("Unable to interpret IMAGE input")
+            if np_img.ndim == 4:
+                np_img = np_img[0]
+            # If channels-first [C,H,W], transpose to HWC
+            if np_img.ndim == 3 and (np_img.shape[0] == 1 or np_img.shape[0] == 3 or np_img.shape[0] == 4) and np_img.shape[2] not in (1,3,4):
+                np_img = _np.transpose(np_img, (1, 2, 0))
+            # Normalize floats to 0..255
+            if _np.issubdtype(np_img.dtype, _np.floating):
+                np_img = _np.clip(np_img, 0.0, 1.0)
+                np_img = (np_img * 255.0).astype(_np.uint8)
+            elif not _np.issubdtype(np_img.dtype, _np.uint8):
+                np_img = np_img.astype(_np.uint8)
+            # Ensure HWC with 3 channels
+            if np_img.ndim == 2:
+                np_img = _np.stack([np_img] * 3, axis=-1)
+            if np_img.ndim == 3 and np_img.shape[2] == 1:
+                np_img = _np.repeat(np_img, 3, axis=2)
+
+                Image.fromarray(np_img).save(out_path)
+                control_image_path = out_path
+        except Exception as e:
+            # If conversion failed and we have a legacy image name, try to resolve that instead.
+            if image is not None:
+                control_image_path = folder_paths.get_annotated_filepath(image)
+            else:
+                raise RuntimeError(f"[MFlux-ComfyUI] Failed to save IMAGE input for Upscale: {e}")
+
         oriented_path, iw, ih = _make_oriented_copy(control_image_path)
 
         # Determine target size and round to multiple of 8
