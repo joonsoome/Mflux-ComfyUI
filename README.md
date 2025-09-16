@@ -40,6 +40,22 @@ Notes:
 - requirements.txt pins mflux==0.10.0; pyproject uses mflux>=0.10.0
 - MLX < 0.27.0 will show a UI hint; upgrade is recommended for stability/perf
 
+## Environment (macOS / zsh)
+
+If you use the repository's virtual environment, this project expects the venv at:
+
+    /Volumes/Macintosh\ HD2/ComfyUI/.venv
+
+Activate it in zsh with:
+
+```zsh
+# Use the exact venv path above
+source /Volumes/Macintosh\ HD2/ComfyUI/.venv/lib/activate
+
+# Or, when your environment has the typical layout:
+# source /Volumes/Macintosh\ HD2/ComfyUI/.venv/bin/activate
+```
+
 ## Nodes
 
 Under MFlux/Air:

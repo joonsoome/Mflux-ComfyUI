@@ -316,6 +316,8 @@ class QuickMfluxNode:
                 "quality_preset": (["Balanced (25 steps)", "Fast (12 steps)", "High Quality (35 steps)", "Custom"], {"default": "Balanced (25 steps)", "tooltip": "Quickly set a quality/step preset."}),
                 "apply_quality_preset": ("BOOLEAN", {"default": True, "label_on": "Use preset", "label_off": "Ignore", "tooltip": "Apply the chosen quality preset to steps (and guidance for dev)."}),
                 "randomize_seed": ("BOOLEAN", {"default": True, "label_on": "Yes", "label_off": "No", "tooltip": "If Yes, seed is set to -1 so each run is different."}),
+                "vae_tiling": ("BOOLEAN", {"default": False, "label_on": "On", "label_off": "Off", "tooltip": "Enable VAE tiling to reduce peak memory for very large images (may introduce seams)."}),
+                "vae_tiling_split": (["horizontal", "vertical"], {"default": "horizontal", "tooltip": "When vae_tiling is enabled, choose split orientation for tiling."}),
             },
             "hidden": {
                 "full_prompt": "PROMPT", 
@@ -327,7 +329,7 @@ class QuickMfluxNode:
     CATEGORY = "MFlux/Air"
     FUNCTION = "generate"
 
-    def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="None", metadata=True, Local_model="", img2img=None, Loras=None, ControlNet=None, base_model="dev", low_ram=False, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True):
+    def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="None", metadata=True, Local_model="", img2img=None, Loras=None, ControlNet=None, base_model="dev", low_ram=False, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True, vae_tiling=False, vae_tiling_split="horizontal"):
         # Apply user-friendly presets without breaking existing graphs
         final_width, final_height = width, height
         if apply_size_preset and isinstance(size_preset, str) and size_preset != "Custom" and "x" in size_preset:
@@ -355,7 +357,23 @@ class QuickMfluxNode:
         local_model_path = Local_model if isinstance(Local_model, str) and Local_model and os.path.exists(Local_model) else None
 
         generated_images = generate_image(
-            prompt, model, final_seed, final_width, final_height, final_steps, final_guidance, quantize, metadata, local_model_path or "", img2img, Loras, ControlNet, base_model=base_model, low_ram=low_ram
+            prompt,
+            model,
+            final_seed,
+            final_width,
+            final_height,
+            final_steps,
+            final_guidance,
+            quantize,
+            metadata,
+            local_model_path or "",
+            img2img,
+            Loras,
+            ControlNet,
+            base_model=base_model,
+            low_ram=low_ram,
+            vae_tiling=vae_tiling,
+            vae_tiling_split=vae_tiling_split,
         )
 
         image_path = img2img.image_path if img2img else None
@@ -398,6 +416,8 @@ class QuickMfluxNode:
                 "filename_prefix": "Mflux",
                 "base_model": base_model,
                 "low_ram": low_ram,
+                "vae_tiling": vae_tiling,
+                "vae_tiling_split": vae_tiling_split,
                 "full_prompt": full_prompt,
                 "extra_pnginfo": extra_pnginfo,
             }

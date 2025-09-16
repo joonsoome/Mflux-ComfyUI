@@ -234,7 +234,7 @@ def get_lora_info(Loras):
         return Loras.lora_paths, Loras.lora_scales
     return [], []
 
-def generate_image(prompt, model, seed, width, height, steps, guidance, quantize="None", metadata=True, Local_model="", image=None, Loras=None, ControlNet=None, base_model="dev", low_ram=False):
+def generate_image(prompt, model, seed, width, height, steps, guidance, quantize="None", metadata=True, Local_model="", image=None, Loras=None, ControlNet=None, base_model="dev", low_ram=False, vae_tiling=False, vae_tiling_split="horizontal", masked_image_path=None, depth_image_path=None, redux_image_paths=None, redux_image_strengths=None):
     warn_if_mlx_old()
 
     model_resolved = "dev" if "dev" in str(Local_model).lower() else ("schnell" if "schnell" in str(Local_model).lower() else model)
@@ -279,42 +279,83 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
         guidance=guidance,
         image_path=image_path,
         image_strength=image_strength,
+        # VAE tiling hints (backend may ignore unknown keys)
+        vae_tiling=vae_tiling,
+        vae_tiling_split=vae_tiling_split,
     )
+
+    # Map additional Phase-2 keys into the Config kwargs when present
+    if masked_image_path:
+        cfg_kwargs["masked_image_path"] = masked_image_path
+        print(f"[MFlux-ComfyUI] Added masked_image_path to config: {masked_image_path}")
+    if depth_image_path:
+        cfg_kwargs["depth_image_path"] = depth_image_path
+        print(f"[MFlux-ComfyUI] Added depth_image_path to config: {depth_image_path}")
+    if redux_image_paths:
+        # Ensure lists are serializable and consistent
+        cfg_kwargs["redux_image_paths"] = list(redux_image_paths) if not isinstance(redux_image_paths, str) else [redux_image_paths]
+        print(f"[MFlux-ComfyUI] Added redux_image_paths to config: {cfg_kwargs['redux_image_paths']}")
+    if redux_image_strengths:
+        cfg_kwargs["redux_image_strengths"] = list(redux_image_strengths) if not isinstance(redux_image_strengths, (int, float)) else [redux_image_strengths]
+        print(f"[MFlux-ComfyUI] Added redux_image_strengths to config: {cfg_kwargs['redux_image_strengths']}")
 
     # ControlNet conditioning (best-effort with 0.10.0 API). If not supported, proceed without it.
     if ControlNet is not None and isinstance(ControlNet, MfluxControlNetPipeline):
         try:
             control_image_path = ControlNet.control_image_path
             control_strength = float(ControlNet.control_strength)
-            # Load and preprocess canny with robust fallbacks
-            with Image.open(control_image_path) as _img:
+            model_name_lower = str(getattr(ControlNet, "model_selection", "")).lower()
+            is_upscaler = ("upscaler" in model_name_lower)
+            if is_upscaler:
+                # For Upscaler, pass the original image (scaled) as the conditioning instead of canny
                 try:
-                    img_scaled = ControlnetUtil.scale_image(height, width, _img)
-                except Exception:
-                    # Fallback to PIL resize if helper missing
-                    img_scaled = _img.resize((width, height), Image.BICUBIC)
+                    with Image.open(control_image_path) as _img:
+                        img_scaled = _img.resize((width, height), Image.BICUBIC)
+                        src_np = np.array(img_scaled).astype(np.float32) / 255.0
+                        if src_np.ndim == 2:
+                            src_np = np.expand_dims(src_np, axis=-1)
+                    try:
+                        h, w = src_np.shape[0], src_np.shape[1]
+                        c = src_np.shape[2] if src_np.ndim == 3 else 1
+                        print(f"[MFlux-ComfyUI] ControlNet Upscaler: cond shape {h}x{w}x{c}, strength={control_strength}")
+                    except Exception:
+                        pass
+                    cfg_kwargs.update({
+                        "controlnet_cond": src_np,
+                        "controlnet_strength": control_strength,
+                    })
+                except Exception as e:
+                    print(f"[MFlux-ComfyUI] Upscaler conditioning failed; proceeding without ControlNet cond: {e}")
+            else:
+                # Load and preprocess canny with robust fallbacks
+                with Image.open(control_image_path) as _img:
+                    try:
+                        img_scaled = ControlnetUtil.scale_image(height, width, _img)
+                    except Exception:
+                        # Fallback to PIL resize if helper missing
+                        img_scaled = _img.resize((width, height), Image.BICUBIC)
+                    try:
+                        canny_img = ControlnetUtil.preprocess_canny(img_scaled)
+                    except Exception:
+                        # Fallback simple edge using FIND_EDGES if helper missing
+                        from PIL import ImageFilter, ImageOps
+                        canny_img = ImageOps.invert(img_scaled.convert("L").filter(ImageFilter.FIND_EDGES))
+                    canny_np = np.array(canny_img).astype(np.float32) / 255.0
+                    if canny_np.ndim == 2:
+                        # expand to HWC with 1 channel
+                        canny_np = np.expand_dims(canny_np, axis=-1)
+                # Attach to config if supported
                 try:
-                    canny_img = ControlnetUtil.preprocess_canny(img_scaled)
+                    h, w = canny_np.shape[0], canny_np.shape[1]
+                    c = canny_np.shape[2] if canny_np.ndim == 3 else 1
+                    print(f"[MFlux-ComfyUI] ControlNet enabled: cond shape {h}x{w}x{c}, strength={control_strength}")
+                    print("[MFlux-ComfyUI] Note: In current mflux backend, ControlNet may run on a slower path than base MLX model, causing large slowdowns.")
                 except Exception:
-                    # Fallback simple edge using FIND_EDGES if helper missing
-                    from PIL import ImageFilter, ImageOps
-                    canny_img = ImageOps.invert(img_scaled.convert("L").filter(ImageFilter.FIND_EDGES))
-                canny_np = np.array(canny_img).astype(np.float32) / 255.0
-                if canny_np.ndim == 2:
-                    # expand to HWC with 1 channel
-                    canny_np = np.expand_dims(canny_np, axis=-1)
-            # Attach to config if supported
-            try:
-                h, w = canny_np.shape[0], canny_np.shape[1]
-                c = canny_np.shape[2] if canny_np.ndim == 3 else 1
-                print(f"[MFlux-ComfyUI] ControlNet enabled: cond shape {h}x{w}x{c}, strength={control_strength}")
-                print("[MFlux-ComfyUI] Note: In current mflux backend, ControlNet may run on a slower path than base MLX model, causing large slowdowns.")
-            except Exception:
-                pass
-            cfg_kwargs.update({
-                "controlnet_cond": canny_np,
-                "controlnet_strength": control_strength,
-            })
+                    pass
+                cfg_kwargs.update({
+                    "controlnet_cond": canny_np,
+                    "controlnet_strength": control_strength,
+                })
         except Exception as e:
             print(f"[MFlux-ComfyUI] ControlNet conditioning not applied due to: {e}")
 
@@ -323,7 +364,7 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
         cfg = Config(**cfg_kwargs)
     except TypeError as te:
         # Remove unknown keys and retry (backend may not support controlnet or other extras)
-        for k in ("controlnet_cond", "controlnet_strength", "low_ram"):
+        for k in ("controlnet_cond", "controlnet_strength", "low_ram", "vae_tiling", "vae_tiling_split", "masked_image_path", "depth_image_path", "redux_image_paths", "redux_image_strengths"):
             cfg_kwargs.pop(k, None)
         cfg = Config(**cfg_kwargs)
 
@@ -515,7 +556,7 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
 
     return (tensor_image,)
 
-def save_images_with_metadata(images, prompt, model, quantize, Local_model, seed, height, width, steps, guidance, lora_paths, lora_scales, image_path, image_strength, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=None, base_model=None, low_ram=False, control_image_path=None, control_strength=None, control_model=None, quantize_effective=None):
+def save_images_with_metadata(images, prompt, model, quantize, Local_model, seed, height, width, steps, guidance, lora_paths, lora_scales, image_path, image_strength, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=None, base_model=None, low_ram=False, control_image_path=None, control_strength=None, control_model=None, quantize_effective=None, vae_tiling=False, vae_tiling_split="horizontal"):
     
     output_dir = folder_paths.get_output_directory()
     full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
@@ -571,6 +612,13 @@ def save_images_with_metadata(images, prompt, model, quantize, Local_model, seed
             "lora_scales": lora_scales,
             "base_model": base_model,
             "low_ram": low_ram,
+            "vae_tiling": vae_tiling,
+            "vae_tiling_split": vae_tiling_split,
+            # Phase-2 metadata fields
+            "masked_image_path": extra_pnginfo.get("masked_image_path") if extra_pnginfo else None,
+            "depth_image_path": extra_pnginfo.get("depth_image_path") if extra_pnginfo else None,
+            "redux_image_paths": extra_pnginfo.get("redux_image_paths") if extra_pnginfo else None,
+            "redux_image_strengths": extra_pnginfo.get("redux_image_strengths") if extra_pnginfo else None,
             "mflux_version": _get_mflux_version(),
             "control_image_path": control_image_path,
             "control_strength": control_strength,
